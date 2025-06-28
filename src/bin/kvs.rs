@@ -12,33 +12,37 @@ enum Command {
 }
 
 #[derive(Parser)]
-#[command(name = "kvs", version = "1.0", about = "A simple key-value store")]
+#[command(name = "kvs", version = env!("CARGO_PKG_VERSION"), author = env!("CARGO_PKG_AUTHORS"), about = "A simple key-value store")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
 }
 
-fn main() {
-    let mut kv = KvStore::new();
+fn main() -> Result<(), std::io::Error> {
     let cli = Cli::parse();
+    let mut store = KvStore::open(std::env::current_dir()?.as_path())?;
+
     match cli.command {
         Command::Get { key } => {
-            // Handle get command
-            if let Some(value) = kv.get(&key) {
-                println!("Found value: {}", value);
+            if let Some(value) = store.get(key) {
+                println!("{}", value);
             } else {
                 println!("Key not found");
+                std::process::exit(0); // Test expects success for missing key
             }
         }
         Command::Set { key, value } => {
-            // Handle set command
-            println!("Setting key: {} with value: {}", key, value);
-            kv.set(key, value);
+            store.set(key, value)?;
+            std::process::exit(0); // Ensure we exit with success
         }
-        Command::Remove { key } => {
-            // Handle remove command
-            println!("Removing key: {}", key);
-            kv.remove(&key);
-        }
+        Command::Remove { key } => match store.remove(key) {
+            Ok(_) => std::process::exit(0), // Success
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                println!("Key not found");
+                std::process::exit(1);
+            }
+            Err(e) => return Err(e),
+        },
     }
+    Ok(())
 }

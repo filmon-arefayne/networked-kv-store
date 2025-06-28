@@ -62,7 +62,7 @@ fn cli_set() {
 }
 
 #[test]
-fn cli_get_stored() -> Result<()> {
+fn cli_get_stored() -> Result<(), std::io::Error> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
 
     let mut store = KvStore::open(temp_dir.path())?;
@@ -89,9 +89,9 @@ fn cli_get_stored() -> Result<()> {
     Ok(())
 }
 
-// `kvs rm <KEY>` should print nothing and exit with zero.
+// `kvs rm <KEY>` should print nothin g and exit with zero.
 #[test]
-fn cli_rm_stored() -> Result<()> {
+fn cli_rm_stored() -> Result<(), std::io::Error> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
 
     let mut store = KvStore::open(temp_dir.path())?;
@@ -179,65 +179,65 @@ fn cli_invalid_subcommand() {
 
 // Should get previously stored value.
 #[test]
-fn get_stored_value() -> Result<()> {
+fn get_stored_value() -> Result<(), std::io::Error> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
 
     store.set("key1".to_owned(), "value1".to_owned())?;
     store.set("key2".to_owned(), "value2".to_owned())?;
 
-    assert_eq!(store.get("key1".to_owned())?, Some("value1".to_owned()));
-    assert_eq!(store.get("key2".to_owned())?, Some("value2".to_owned()));
+    assert_eq!(store.get("key1".to_owned()), Some("value1".to_owned()));
+    assert_eq!(store.get("key2".to_owned()), Some("value2".to_owned()));
 
     // Open from disk again and check persistent data.
     drop(store);
-    let mut store = KvStore::open(temp_dir.path())?;
-    assert_eq!(store.get("key1".to_owned())?, Some("value1".to_owned()));
-    assert_eq!(store.get("key2".to_owned())?, Some("value2".to_owned()));
+    let store = KvStore::open(temp_dir.path())?;
+    assert_eq!(store.get("key1".to_owned()), Some("value1".to_owned()));
+    assert_eq!(store.get("key2".to_owned()), Some("value2".to_owned()));
 
     Ok(())
 }
 
 // Should overwrite existent value.
 #[test]
-fn overwrite_value() -> Result<()> {
+fn overwrite_value() -> Result<(), std::io::Error> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
 
     store.set("key1".to_owned(), "value1".to_owned())?;
-    assert_eq!(store.get("key1".to_owned())?, Some("value1".to_owned()));
+    assert_eq!(store.get("key1".to_owned()), Some("value1".to_owned()));
     store.set("key1".to_owned(), "value2".to_owned())?;
-    assert_eq!(store.get("key1".to_owned())?, Some("value2".to_owned()));
+    assert_eq!(store.get("key1".to_owned()), Some("value2".to_owned()));
 
     // Open from disk again and check persistent data.
     drop(store);
     let mut store = KvStore::open(temp_dir.path())?;
-    assert_eq!(store.get("key1".to_owned())?, Some("value2".to_owned()));
+    assert_eq!(store.get("key1".to_owned()), Some("value2".to_owned()));
     store.set("key1".to_owned(), "value3".to_owned())?;
-    assert_eq!(store.get("key1".to_owned())?, Some("value3".to_owned()));
+    assert_eq!(store.get("key1".to_owned()), Some("value3".to_owned()));
 
     Ok(())
 }
 
 // Should get `None` when getting a non-existent key.
 #[test]
-fn get_non_existent_value() -> Result<()> {
+fn get_non_existent_value() -> Result<(), std::io::Error> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
 
     store.set("key1".to_owned(), "value1".to_owned())?;
-    assert_eq!(store.get("key2".to_owned())?, None);
+    assert_eq!(store.get("key2".to_owned()), None);
 
     // Open from disk again and check persistent data.
     drop(store);
     let mut store = KvStore::open(temp_dir.path())?;
-    assert_eq!(store.get("key2".to_owned())?, None);
+    assert_eq!(store.get("key2".to_owned()), None);
 
     Ok(())
 }
 
 #[test]
-fn remove_non_existent_key() -> Result<()> {
+fn remove_non_existent_key() -> Result<(), std::io::Error> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
     assert!(store.remove("key1".to_owned()).is_err());
@@ -245,19 +245,19 @@ fn remove_non_existent_key() -> Result<()> {
 }
 
 #[test]
-fn remove_key() -> Result<()> {
+fn remove_key() -> Result<(), std::io::Error> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
     store.set("key1".to_owned(), "value1".to_owned())?;
     assert!(store.remove("key1".to_owned()).is_ok());
-    assert_eq!(store.get("key1".to_owned())?, None);
+    assert_eq!(store.get("key1".to_owned()), None);
     Ok(())
 }
 
 // Insert data until total size of the directory decreases.
 // Test data correctness after compaction.
 #[test]
-fn compaction() -> Result<()> {
+fn compaction() -> Result<(), std::io::Error> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
 
@@ -289,10 +289,10 @@ fn compaction() -> Result<()> {
 
         drop(store);
         // reopen and check content.
-        let mut store = KvStore::open(temp_dir.path())?;
+        let store = KvStore::open(temp_dir.path())?;
         for key_id in 0..1000 {
             let key = format!("key{}", key_id);
-            assert_eq!(store.get(key)?, Some(format!("{}", iter)));
+            assert_eq!(store.get(key), Some(format!("{}", iter)));
         }
         return Ok(());
     }
