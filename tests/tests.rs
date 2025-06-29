@@ -1,5 +1,5 @@
 use assert_cmd::prelude::*;
-use networked_kv_store::KvStore;
+use networked_kv_store::{KvStore, Result};
 use predicates::ord::eq;
 use predicates::str::{PredicateStrExt, contains, is_empty};
 use std::process::Command;
@@ -62,7 +62,7 @@ fn cli_set() {
 }
 
 #[test]
-fn cli_get_stored() -> Result<(), std::io::Error> {
+fn cli_get_stored() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
 
     let mut store = KvStore::open(temp_dir.path())?;
@@ -91,7 +91,7 @@ fn cli_get_stored() -> Result<(), std::io::Error> {
 
 // `kvs rm <KEY>` should print nothin g and exit with zero.
 #[test]
-fn cli_rm_stored() -> Result<(), std::io::Error> {
+fn cli_rm_stored() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
 
     let mut store = KvStore::open(temp_dir.path())?;
@@ -179,7 +179,7 @@ fn cli_invalid_subcommand() {
 
 // Should get previously stored value.
 #[test]
-fn get_stored_value() -> Result<(), std::io::Error> {
+fn get_stored_value() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
 
@@ -200,7 +200,7 @@ fn get_stored_value() -> Result<(), std::io::Error> {
 
 // Should overwrite existent value.
 #[test]
-fn overwrite_value() -> Result<(), std::io::Error> {
+fn overwrite_value() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
 
@@ -221,7 +221,7 @@ fn overwrite_value() -> Result<(), std::io::Error> {
 
 // Should get `None` when getting a non-existent key.
 #[test]
-fn get_non_existent_value() -> Result<(), std::io::Error> {
+fn get_non_existent_value() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
 
@@ -230,14 +230,14 @@ fn get_non_existent_value() -> Result<(), std::io::Error> {
 
     // Open from disk again and check persistent data.
     drop(store);
-    let mut store = KvStore::open(temp_dir.path())?;
+    let store = KvStore::open(temp_dir.path())?;
     assert_eq!(store.get("key2".to_owned()), None);
 
     Ok(())
 }
 
 #[test]
-fn remove_non_existent_key() -> Result<(), std::io::Error> {
+fn remove_non_existent_key() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
     assert!(store.remove("key1".to_owned()).is_err());
@@ -245,7 +245,7 @@ fn remove_non_existent_key() -> Result<(), std::io::Error> {
 }
 
 #[test]
-fn remove_key() -> Result<(), std::io::Error> {
+fn remove_key() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
     store.set("key1".to_owned(), "value1".to_owned())?;
@@ -257,7 +257,7 @@ fn remove_key() -> Result<(), std::io::Error> {
 // Insert data until total size of the directory decreases.
 // Test data correctness after compaction.
 #[test]
-fn compaction() -> Result<(), std::io::Error> {
+fn compaction() -> Result<()> {
     let temp_dir = TempDir::new().expect("unable to create temporary working directory");
     let mut store = KvStore::open(temp_dir.path())?;
 

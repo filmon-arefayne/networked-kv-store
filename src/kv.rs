@@ -1,3 +1,5 @@
+use crate::{KvsError, error::Result};
+
 use serde::{Deserialize, Serialize};
 
 use std::{
@@ -18,14 +20,23 @@ enum LogEntry {
 #[derive(Debug)]
 pub struct KvStore {
     map: HashMap<String, String>,
-    log_path: Box<Path>,
+    dir_path: Box<Path>,
 }
 
+const COMPACTION_SIZE: u64 = 1024 * 1024; // 1 MB
+
 impl KvStore {
-    /// Creates a new KvStore instance with the default log path
-    pub fn new() -> Result<Self, std::io::Error> {
-        let path = std::env::current_dir()?.join("kvstore.log");
-        Self::open(path.as_path())
+    /// Creates a new KvStore instance with the default path (current directory)
+    pub fn new() -> Result<Self> {
+        Self::open(std::path::Path::new("."))
+    }
+
+    fn get_log_path(&self) -> std::path::PathBuf {
+        self.dir_path.join("kvstore.log")
+    }
+
+    fn get_temp_log_path(&self) -> std::path::PathBuf {
+        self.dir_path.join("kvstore.log.tmp")
     }
 
     /// Gets a value by key
@@ -34,7 +45,7 @@ impl KvStore {
     }
 
     /// Sets a value for a key
-    pub fn set(&mut self, key: String, value: String) -> Result<(), std::io::Error> {
+    pub fn set(&mut self, key: String, value: String) -> Result<()> {
         let entry = LogEntry::Set {
             key: key.clone(),
             value: value.clone(),
@@ -44,7 +55,7 @@ impl KvStore {
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&self.log_path)?;
+            .open(self.get_log_path())?;
 
         writeln!(file, "{}", serde_json::to_string(&entry)?)?;
 
@@ -53,7 +64,7 @@ impl KvStore {
 
         // Check if compaction is needed
         // Compact if file size is larger than 1MB
-        if self.log_size()? > 1024 * 1024 {
+        if self.log_size()? > COMPACTION_SIZE {
             self.compact()?;
         }
 
@@ -62,12 +73,9 @@ impl KvStore {
 
     /// Removes a key and its associated value
     /// Returns an error if the key doesn't exist
-    pub fn remove(&mut self, key: String) -> Result<(), std::io::Error> {
+    pub fn remove(&mut self, key: String) -> Result<()> {
         if !self.map.contains_key(&key) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Key not found",
-            ));
+            return Err(KvsError::KeyNotFound);
         }
 
         let entry = LogEntry::Remove { key: key.clone() };
@@ -76,7 +84,7 @@ impl KvStore {
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&self.log_path)?;
+            .open(self.get_log_path())?;
 
         writeln!(file, "{}", serde_json::to_string(&entry)?)?;
 
@@ -85,26 +93,33 @@ impl KvStore {
         Ok(())
     }
 
-    /// Opens a KvStore from a file path
-    pub fn open(path: &Path) -> Result<KvStore, std::io::Error> {
-        let mut store = KvStore {
-            map: HashMap::new(),
-            log_path: path.into(),
+    /// Opens a KvStore at a given directory path
+    pub fn open(path: &Path) -> Result<KvStore> {
+        // Convert to absolute path if it's relative
+        let abs_path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            std::env::current_dir()?.join(path)
         };
 
-        // Ensure the parent directory exists
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
+        // Ensure the directory exists
+        std::fs::create_dir_all(&abs_path)?;
+
+        let mut store = KvStore {
+            map: HashMap::new(),
+            dir_path: abs_path.into(),
+        };
+
+        let log_path = store.get_log_path();
 
         // Create file if it doesn't exist
-        if !path.exists() {
-            File::create(path)?;
+        if !log_path.exists() {
+            File::create(&log_path)?;
             return Ok(store);
         }
 
         // Read the log file and replay all operations
-        let file = File::open(path)?;
+        let file = File::open(&log_path)?;
         let reader = BufReader::new(file);
 
         for line in reader.lines() {
@@ -126,8 +141,8 @@ impl KvStore {
     }
 
     /// Compacts the log by removing redundant entries
-    fn compact(&mut self) -> Result<(), std::io::Error> {
-        let temp_path = self.log_path.with_extension("tmp");
+    fn compact(&mut self) -> Result<()> {
+        let temp_path = self.get_temp_log_path();
         let mut temp_file = OpenOptions::new()
             .create(true)
             .write(true)
@@ -143,13 +158,13 @@ impl KvStore {
         }
 
         // Replace old log with new one
-        std::fs::rename(temp_path, &self.log_path)?;
+        std::fs::rename(temp_path, self.get_log_path())?;
 
         Ok(())
     }
 
     /// Returns the size of the log file in bytes
-    fn log_size(&self) -> Result<u64, std::io::Error> {
-        Ok(std::fs::metadata(&self.log_path)?.len())
+    fn log_size(&self) -> Result<u64> {
+        Ok(std::fs::metadata(self.get_log_path())?.len())
     }
 }
