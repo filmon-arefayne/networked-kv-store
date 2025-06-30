@@ -1,3 +1,5 @@
+use std::env::current_dir;
+
 use clap::{Parser, Subcommand};
 use networked_kv_store::KvStore;
 use networked_kv_store::KvsError;
@@ -25,23 +27,23 @@ fn main() -> Result<()> {
 
     match cli.command {
         Command::Get { key } => {
-            let store = KvStore::new()?;
+            let mut store = KvStore::open(current_dir()?)?;
 
-            if let Some(value) = store.get(key) {
-                println!("{}", value);
+            if let Some(value) = store.get(key)? {
+                println!("{value}");
             } else {
                 println!("Key not found");
                 std::process::exit(0);
             }
         }
         Command::Set { key, value } => {
-            let mut store = KvStore::new()?;
+            let mut store = KvStore::open(current_dir()?)?;
 
             store.set(key, value)?;
             std::process::exit(0);
         }
         Command::Rm { key } => {
-            let mut store = KvStore::new()?;
+            let mut store = KvStore::open(current_dir()?)?;
             match store.remove(key) {
                 Ok(_) => std::process::exit(0),
                 Err(e) => match e {
@@ -50,7 +52,7 @@ fn main() -> Result<()> {
                         std::process::exit(1);
                     }
                     _ => {
-                        eprintln!("Error: {}", e);
+                        eprintln!("Error: {e}");
                         std::process::exit(1);
                     }
                 },

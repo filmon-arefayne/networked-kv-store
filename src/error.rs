@@ -17,8 +17,8 @@ pub enum KvsError {
 impl Display for KvsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            KvsError::IoError(e) => write!(f, "I/O error: {}", e),
-            KvsError::SerdeError(e) => write!(f, "Serialization error: {}", e),
+            KvsError::IoError(e) => write!(f, "I/O error: {e}"),
+            KvsError::SerdeError(e) => write!(f, "Serialization error: {e}"),
             KvsError::KeyNotFound => write!(f, "Key not found"),
             KvsError::UnexpectedCommandType => write!(f, "Unexpected command type"),
         }
